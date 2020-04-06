@@ -1,2 +1,2 @@
 @ECHO OFF
-git fetch origin & git checkout FETCH_HEAD -- COVID19_Fallzahlen_Beispiel.csv
+git fetch origin & git checkout origin/master -- COVID19_Fallzahlen_CH_total.csv

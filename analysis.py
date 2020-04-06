@@ -187,7 +187,7 @@ if __name__ == '__main__':
                      'ncumul_deceased']
 
     errors = check_inconsistencies(df, df.canton.unique(), cumul_columns,
-                                   fillna=True)
+                                   fillna=False)
     canton_reports = no_same_day_reports(df)
 
     # Drop the time column since there normally aren't any same day reports
@@ -203,7 +203,7 @@ if __name__ == '__main__':
 
     # draw_plot(full_df, 'ncumul_deceased', ['FR'], exclude_FL=False,
     #           remove_cumul=True)
-    draw_plot(full_df, 'ncumul_deceased', full_df.canton.unique(),
-              remove_cumul=False)
+    # draw_plot(full_df, 'ncumul_deceased', full_df.canton.unique(),
+    #           remove_cumul=False)
     # Example of graphing deaths in canton FR
     # df[df.canton == 'SG'].plot(x='date', y='ncumul_deceased')

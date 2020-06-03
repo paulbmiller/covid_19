@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 # CONSTANTS
@@ -148,6 +149,9 @@ def draw_plot(df, column, cantons=None, exclude_FL=True, remove_cumul=False,
         - exclude the Liechtenstein values (by default)
         - remove the cumulation of the column
         - edit the plot title
+    
+    Major x-axis ticks at the start of the month and minor x-axis ticks every
+    Monday.
 
     Parameters
     ----------
@@ -241,6 +245,9 @@ def draw_plot(df, column, cantons=None, exclude_FL=True, remove_cumul=False,
             ax = df_sums.plot(title=plt_title)
 
     ax.autoscale(axis='x', tight=True)
+    ax.set(xlabel=' ')
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    ax.xaxis.set_minor_locator(mdates.WeekdayLocator(weekday=0))
 
 
 if __name__ == '__main__':

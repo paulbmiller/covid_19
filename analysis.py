@@ -247,7 +247,6 @@ def draw_plot(df, column, cantons=None, exclude_FL=True, remove_cumul=False,
     ax.autoscale(axis='x', tight=True)
     ax.set(xlabel=' ')
     ax.xaxis.set_major_locator(mdates.MonthLocator())
-    ax.xaxis.set_minor_locator(mdates.WeekdayLocator(weekday=0))
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from matplotlib import lines
 
 
 # CONSTANTS
@@ -141,7 +142,7 @@ def make_new_df(df, cumul_columns):
 
 
 def draw_plot(df, column, cantons=None, exclude_FL=True, remove_cumul=False,
-              title=None):
+              title=None, timeline=False):
     """
     Function to draw the plots of a column of the pandas DataFrame. It gives us
     different options:
@@ -244,9 +245,26 @@ def draw_plot(df, column, cantons=None, exclude_FL=True, remove_cumul=False,
                 df_sums[df_sums < 0] = 0
             ax = df_sums.plot(title=plt_title)
 
-    ax.autoscale(axis='x', tight=True)
+    # ax.autoscale(axis='x', tight=True)
     ax.set(xlabel=' ')
-    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    
+    if timeline:
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width*0.9, box.height])
+        ax.axvline(x=pd.to_datetime('02-28-20'), color='r', alpha=0.8,
+                   ls='--', label='Ban events > 1000')
+        ax.axvline(x=pd.to_datetime('03-13-20'), color='g', alpha=0.8,
+                   ls='--', label='Ban > 100 & close schools')
+        ax.axvline(x=pd.to_datetime('03-16-20'), color='m', alpha=0.8,
+                   ls='--', label='Close bars and shops')
+        ax.axvline(x=pd.to_datetime('04-27-20'), color='r', alpha=0.8,
+                   ls='-', label='Reopen dentists, hairdressers...')
+        ax.axvline(x=pd.to_datetime('05-11-20'), color='g', alpha=0.8,
+                   ls='-', label='Reopen schools and shops')
+        
+        ax.legend(loc='lower right', bbox_to_anchor=(1.2, 0.5), fancybox=True)
+
+    return ax
 
 
 if __name__ == '__main__':
@@ -275,8 +293,13 @@ if __name__ == '__main__':
     
     full_df['date'] = pd.to_datetime(full_df['date'], format='%Y-%m-%d')
     
-    draw_plot(full_df[:-27], 'ncumul_deceased', remove_cumul=True,
-              title='New deaths from Covid-19 in Switzerland until yesterday')
+    last_date = full_df[:-27]['date'].max().strftime("%d %m %Y")
+    
+    ax = draw_plot(full_df[:-27], 'ncumul_deceased', remove_cumul=True,
+              title='New deaths from Covid-19 in Switzerland until {}'.format(
+                  last_date), timeline=True)
+    
+    plt.show()
 
     print("Yesterday's numbers may not be available yet.")
 

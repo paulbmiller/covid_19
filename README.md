@@ -13,4 +13,9 @@ Run the actualize command to get the new version of the csv file
 Run the ./actualize.sh command to get the new version of the csv file
 
 ## Functions
-draw_plot can be used to draw the graphs for specific cantons, multiple cantons or all of them (with the possibility to include FL).
+The function draw_plot can be used to draw a graph of the different columns with several options. Here are graph examples:
+![Sample](sample.png)
+
+## Notes
+There are several missing values in the data and some cantons don't update very regularly.
+

@@ -9,11 +9,52 @@ from matplotlib import lines
 MAX_CANTONS = 8
 
 
-def import_csv_total(filepath):
-    return pd.read_csv(filepath)
+def preprocess(df_path):
+    df = pd.read_csv(df_path)
+    
+    df = df.drop(columns='source')
+    df = df.rename(columns={'abbreviation_canton_and_fl': 'canton'})
+    
+    """
+    Here I define the supposedly cumulative columns. In practice, I do not
+    use the ncumul_conf, ncumul_hosp, ncumul_ICU columns because they are
+    inconsistent.
+    
+    cumul_columns = ['ncumul_tested', 'ncumul_conf', 'ncumul_hosp',
+                     'ncumul_ICU', 'ncumul_vent', 'ncumul_released',
+                     'ncumul_deceased']
+    """
+
+    cumul_columns = ['ncumul_tested', 'ncumul_conf', 'ncumul_released',
+                     'ncumul_deceased']
+    
+    # Check that the columns are cumulative numbers
+    errors = check_inconsistencies(df, cumul_columns, fillna=True)
+    
+    canton_reports = no_same_day_reports(df)
+
+    # Drop the time column since there normally aren't any same day reports
+    df = df.drop(columns='time')
+    
+    sorted_df = df.sort_values(by=['canton', 'date'], ignore_index=True)
+
+    full_df = make_new_df(sorted_df, cumul_columns)
+
+    # Check that the new dataframe with all dates does not contain errors
+    errors = check_inconsistencies(full_df, cumul_columns, fillna=True)
+
+    for col in cumul_columns:
+        full_df[col] = full_df[col].astype(int)
+    
+    full_df['date'] = pd.to_datetime(full_df['date'], format='%Y-%m-%d')
+    
+    # Drop the last day since the reports have probably not all come in
+    full_df=full_df[:-27]
+    
+    return full_df
 
 
-def check_inconsistencies(df, cantons, columns, fillna=False, verbose=False):
+def check_inconsistencies(df, columns, fillna=False, verbose=False):
     """
     This function will go through the given columns and check for
     inconsistencies in the values for each canton by looking at previously
@@ -47,20 +88,22 @@ def check_inconsistencies(df, cantons, columns, fillna=False, verbose=False):
         List of tuples of inconsistencies found (list of (index, column)).
 
     """
+    cantons = df['canton'].unique()
     inconsistencies = []
     for col_name in columns:
         for canton in cantons:
             has_value = False
             max_value = 0.
-            for index in df.loc[df['canton'] == canton, col_name].index:
+            for index in df[df['canton'] == canton][col_name].index:
                 if not has_value:
-                    if np.isnan(df.loc[index, col_name]) and fillna:
-                        df.loc[index, col_name] = max_value
+                    if np.isnan(df.loc[index, col_name]):
+                        if fillna:
+                            df.loc[index, col_name] = max_value
                     else:
                         has_value = True
                         max_value = df.loc[index, col_name]
                 else:
-                    if np.isnan(df.loc[index, col_name]) and fillna:
+                    if np.isnan(df.loc[index, col_name]):
                         df.loc[index, col_name] = max_value
                     elif max_value > df.loc[index, col_name]:
                         inconsistencies.append((index, col_name))
@@ -130,7 +173,7 @@ def make_new_df(df, cumul_columns):
     for index in df.index:
         row = df.loc[index]
         canton = row['canton']
-        date = row.date
+        date = row['date']
         full_df_id = full_df[
             full_df['canton'] == canton].loc[full_df.date == date].index[0]
 
@@ -141,112 +184,117 @@ def make_new_df(df, cumul_columns):
     return full_df
 
 
-def draw_plot(df, column, cantons=None, exclude_FL=True, remove_cumul=False,
-              title=None, timeline=False):
+def format_col(col_list):
+    # Get a string instead of a list if there is only one column
+    if len(col_list) == 1:
+        return col_list[0]
+    else:
+        return col_list
+
+
+def draw_plot(df, columns, cantons=None, exclude_FL=True, agg=True,
+              remove_cumul=True, title=None, timeline=False, ax=None):
     """
     Function to draw the plots of a column of the pandas DataFrame. It gives us
     different options:
         - draw cantons separately instead of aggregating
         - exclude the Liechtenstein values (by default)
-        - remove the cumulation of the column
-        - edit the plot title
-    
-    Major x-axis ticks at the start of the month and minor x-axis ticks every
-    Monday.
+        - difference a cumulative column
+
+    Major x-ticks occur every month start and minor ticks every Monday.
 
     Parameters
     ----------
     df : pd.DataFrame
         The preprocessed DataFrame of the Covid-19 database.
-    column : string
-        Name of the column we want to plot.
+    columns : list
+        List of columns of the dataframe we want to plot.
     cantons : list, optional
-        List of canton abbreviations. The default is None.
+        List of canton abbreviations. The default is None (all cantons).
     exclude_FL : bool, optional
         Whether we want to exclude Liechtenstein. The default is True.
+    agg : bool, optional
+        Whether we want the sum of cantons. The default is True.
     remove_cumul : bool, optional
-        Whether we remove cumulation. The default is False.
+        Whether we remove cumulation. The default is True.
     title : string, optional
         Title of the plot. The default is None.
+    timeline : bool, optional
+        Whether we want to plot vertical lines of the timeline.
+    ax : matplotlib.axes._subplots.AxesSubplot
+        Matplotlib ax object in case we want to add to an existing plot.    
 
     Returns
     -------
-    None.
-
+    ax : matplotlib.axes._subplots.AxesSubplot
+        Axes object that we plotted with.
     """
-    if cantons is None:
-        cantons = df.canton.unique()
-
-        if exclude_FL:
-            if not title:
-                plt_title = 'Sum of {} in Switzerland'.format(column)
-            else:
-                plt_title = title
-            plt.locator_params(axis='x', nbins=5)
-            df_sums = df[df['canton'] != 'FL'].groupby(['date'])[column].sum()
-            if remove_cumul:
-                df_sums[1:] = df_sums[1:] - df_sums[:-1].to_numpy()
-                df_sums[df_sums < 0] = 0
-            ax = df_sums.plot(title=plt_title)
-        else:
-            if not title:
-                plt_title = 'Sum of {} in Switzerland and FL'.format(column)
-            else:
-                plt_title = title
-            plt.locator_params(axis='x', nbins=5)
-            df_sums = df.groupby(['date'])[column].sum()
-            if remove_cumul:
-                df_sums[1:] = df_sums[1:] - df_sums[:-1].to_numpy()
-                df_sums[df_sums < 0] = 0
-            ax = df_sums.plot(title=plt_title)
-
-    else:
+    
+    if not ax:
         plt.figure()
-        plt.locator_params(axis='x', nbins=5)
-
-        if len(cantons) > 1:
-            if len(cantons) < MAX_CANTONS:
-                plt_title = 'Sum of {} for cantons {}'.format(
-                    column, '/'.join(cantons))
-                plt.legend(cantons, loc='upper left')
-                
-                for canton in cantons:
-                    df_sums = df[df['canton'] == canton].groupby(
-                        ['date'])[column].sum()
-                    if remove_cumul:
-                        df_sums[1:] = df_sums[1:] - df_sums[:-1].to_numpy()
-                        df_sums[df_sums < 0] = 0
-                    ax = df_sums.plot(title=plt_title)
-                    ax.legend(cantons, loc='upper left')
-                
-            # If the list of cantons to plot is too big, just show all cantons
-            # and add a legend for the biggest values
-            else:
-                plt_title = 'Sum of {} for cantons'.format(column)
-                top_cantons = df[df['date'] == df['date'].max()].loc[
-                    :, ['canton', column]].nlargest(50,
-                                                    column).canton.to_numpy()
-
-                for canton in top_cantons:
-                    df_sums = df[df['canton'] == canton].groupby(
-                        ['date'])[column].sum()
-                    if remove_cumul:
-                        df_sums[1:] = df_sums[1:] - df_sums[:-1].to_numpy()
-                        df_sums[df_sums < 0] = 0
-                    ax = df_sums.plot(title=plt_title)
-                    ax.legend(top_cantons[0:MAX_CANTONS], loc='upper left')
-
+        ax = plt.gca()
+    
+    if cantons is None:
+        cantons = list(df['canton'].unique())
+    
+    if exclude_FL:
+        df = df[df['canton'] != 'FL']
+        if 'FL' in cantons:
+            cantons.remove('FL')
+    
+    if len(columns) > 1:
+        assert agg, "Can't plot multiple columns without aggregation"
+    if len(cantons) > 1:
+        assert len(columns) == 1 or agg, "Can't plot multiple columns for multiple cantons"
+    
+    if len(cantons) >= MAX_CANTONS and not agg:
+        agg = True
+        print("Forced aggregation, because there we are trying to plot more than {} cantons.".format(MAX_CANTONS))
+    
+    last_date = full_df['date'].max().strftime("%d %m %Y")
+    
+    if agg:
+        if remove_cumul:
+            df[df['canton'].isin(cantons)].groupby(
+                by='date').sum()[columns].diff().fillna(0).plot(ax=ax)
         else:
-            plt_title = 'Sum of {} for canton {}'.format(column, cantons[0])
-            df_sums = df[df['canton'] == cantons[0]].groupby(
-                ['date'])[column].sum()
-            if remove_cumul:
-                df_sums[1:] = df_sums[1:] - df_sums[:-1].to_numpy()
-                df_sums[df_sums < 0] = 0
-            ax = df_sums.plot(title=plt_title)
-
-    # ax.autoscale(axis='x', tight=True)
-    ax.set(xlabel=' ')
+            df[df['canton'].isin(cantons)].groupby(
+                by='date').sum()[columns].plot(ax=ax)
+    
+    else:
+        if remove_cumul:
+            for canton in cantons:
+                x = df[df['canton'] == canton][columns].diff().fillna(0)
+                x.index = df[df['canton'] == canton]['date'].values
+                line, = ax.plot(x.index, x[columns])
+                line.set_label(canton)
+        else:
+            for canton in cantons:
+                x = df[df['canton'] == canton][columns]
+                x.index = df[df['canton'] == canton]['date'].values
+                line, = ax.plot(x.index, x[columns])
+                line.set_label(canton)
+    
+    if not title:
+        plot_title = ''
+        if agg:
+            plot_title += 'Sum of '
+        if remove_cumul:
+            plot_title += 'diffed {} '.format(format_col(columns))
+        else:
+            plot_title += 'cumulative {} '.format(format_col(columns))
+        plot_title = plot_title.capitalize()
+        if len(cantons) == 26 and exclude_FL:
+            plot_title += 'for Switzerland until {}'.format(last_date)
+        elif len(cantons) == 27:
+            plot_title += 'for CH and FL until {}'.format(last_date)
+        elif len(cantons) < MAX_CANTONS:
+            plot_title += 'of cantons {} until {}'.format(cantons, last_date)
+        else:
+            plot_title += 'for {} cantons until {}'.format(len(cantons), last_date)
+    
+    ax.set_title(plot_title)
+    ax.set_xlabel('')
     
     if timeline:
         box = ax.get_position()
@@ -261,51 +309,32 @@ def draw_plot(df, column, cantons=None, exclude_FL=True, remove_cumul=False,
                    ls='-', label='Reopen dentists, hairdressers...')
         ax.axvline(x=pd.to_datetime('05-11-20'), color='g', alpha=0.8,
                    ls='-', label='Reopen schools and shops')
+        ax.axvline(x=pd.to_datetime('07-06-20'), color='m', alpha=0.8,
+                   ls='-', label='Masks in public transport')
         
         ax.legend(loc='lower right', bbox_to_anchor=(1.2, 0.5), fancybox=True)
-
+        
     return ax
 
 
 if __name__ == '__main__':
-    df = import_csv_total('COVID19_Fallzahlen_CH_total.csv')
+    full_df = preprocess('COVID19_Fallzahlen_CH_total.csv')
     
-    df = df.drop(columns='source')
-    df = df.rename(columns={'abbreviation_canton_and_fl': 'canton'})
-    cumul_columns = ['ncumul_tested', 'ncumul_conf', 'ncumul_hosp',
-                     'ncumul_ICU', 'ncumul_vent', 'ncumul_released',
-                     'ncumul_deceased']
-
-    errors = check_inconsistencies(df, df.canton.unique(), cumul_columns,
-                                   fillna=False)
-    canton_reports = no_same_day_reports(df)
-
-    # Drop the time column since there normally aren't any same day reports
-    df = df.drop(columns='time')
-
-    full_df = make_new_df(df, cumul_columns)
-
-    errors = check_inconsistencies(full_df, full_df.canton.unique(),
-                                   cumul_columns, fillna=True)
-
-    for col in cumul_columns:
-        full_df[col] = full_df[col].astype(int)
+    fig, axes = plt.subplots(2, 2)
     
-    full_df['date'] = pd.to_datetime(full_df['date'], format='%Y-%m-%d')
-    
-    last_date = full_df[:-27]['date'].max().strftime("%d %m %Y")
-    
-    ax = draw_plot(full_df[:-27], 'ncumul_deceased', remove_cumul=True,
-              title='New deaths from Covid-19 in Switzerland until {}'.format(
-                  last_date), timeline=True)
-    
-    plt.show()
+    draw_plot(full_df, ['ncumul_deceased'], cantons=['FR', 'VD'], exclude_FL=True,
+              agg=False, remove_cumul=True, title=None, timeline=True,
+              ax=axes[0, 0])
 
-    print("Yesterday's numbers may not be available yet.")
+    draw_plot(full_df, ['ncumul_released'], cantons=None,
+              exclude_FL=True, agg=True, remove_cumul=True, title=None,
+              timeline=False, ax=axes[0, 1])
+    
+    draw_plot(full_df, ['ncumul_tested'], cantons=None, exclude_FL=False,
+              agg=True, remove_cumul=False, title=None, timeline=False,
+              ax=axes[1, 0])
 
-    # draw_plot(full_df, 'ncumul_deceased', ['FR'], exclude_FL=False,
-    #           remove_cumul=True)
-    # draw_plot(full_df, 'ncumul_deceased', full_df.canton.unique(),
-    #           remove_cumul=False)
-    # Example of graphing deaths in canton FR
-    # df[df.canton == 'SG'].plot(x='date', y='ncumul_deceased')
+    draw_plot(full_df, ['ncumul_conf'], cantons=None, exclude_FL=True,
+              agg=True, remove_cumul=True, title=None, timeline=False,
+              ax=axes[1, 1])
+

@@ -17,5 +17,6 @@ The function draw_plot can be used to draw a graph of the different columns with
 ![Sample](sample.png)
 
 ## Notes
-There are several missing values in the data and some cantons don't update very regularly.
+The cumulative columns that don't contain errors are named 'ncumul_deceased', 'ncumul_released', 'ncumul_tested', 'ncumul_conf'
+There are several missing values in the data and some cantons don't update very regularly. For example, we can see on the graph above that the number of tests aren't updated often.
 

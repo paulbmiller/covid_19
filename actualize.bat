@@ -1,2 +1,2 @@
 @ECHO OFF
-git fetch origin & git checkout origin/master -- COVID19_Fallzahlen_CH_total.csv
+curl -LJO https://raw.githubusercontent.com/openZH/covid_19/master/COVID19_Fallzahlen_CH_total.csv

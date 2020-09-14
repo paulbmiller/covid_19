@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib import lines
+import matplotlib
 
 
 # CONSTANTS
@@ -276,24 +277,24 @@ def draw_plot(df, columns, cantons=None, exclude_FL=True, agg=True,
                 line.set_label(canton)
     
     if not title:
-        plot_title = ''
+        title = ''
         if agg:
-            plot_title += 'Sum of '
+            title += 'Sum of '
         if remove_cumul:
-            plot_title += 'diffed {} '.format(format_col(columns))
+            title += 'diffed {} '.format(format_col(columns))
         else:
-            plot_title += 'cumulative {} '.format(format_col(columns))
-        plot_title = plot_title.capitalize()
+            title += 'cumulative {} '.format(format_col(columns))
+        title = title.capitalize()
         if len(cantons) == 26 and exclude_FL:
-            plot_title += 'for Switzerland until {}'.format(last_date)
+            title += 'for Switzerland until {}'.format(last_date)
         elif len(cantons) == 27:
-            plot_title += 'for CH and FL until {}'.format(last_date)
+            title += 'for CH and FL until {}'.format(last_date)
         elif len(cantons) < MAX_CANTONS:
-            plot_title += 'of cantons {} until {}'.format(cantons, last_date)
+            title += 'of cantons {} until {}'.format(cantons, last_date)
         else:
-            plot_title += 'for {} cantons until {}'.format(len(cantons), last_date)
+            title += 'for {} cantons until {}'.format(len(cantons), last_date)
     
-    ax.set_title(plot_title)
+    ax.set_title(title)
     ax.set_xlabel('')
     
     if timeline:
@@ -317,9 +318,7 @@ def draw_plot(df, columns, cantons=None, exclude_FL=True, agg=True,
     return ax
 
 
-if __name__ == '__main__':
-    full_df = preprocess('COVID19_Fallzahlen_CH_total.csv')
-    
+def draw_example(full_df):
     fig, axes = plt.subplots(2, 2)
     
     draw_plot(full_df, ['ncumul_deceased'], cantons=['FR', 'VD'], exclude_FL=True,
@@ -335,6 +334,37 @@ if __name__ == '__main__':
               ax=axes[1, 0])
 
     draw_plot(full_df, ['ncumul_conf'], cantons=None, exclude_FL=True,
-              agg=True, remove_cumul=True, title=None, timeline=False,
+              agg=True, remove_cumul=True, title=None, timeline=True,
               ax=axes[1, 1])
 
+
+def draw_deceased(full_df, timeline=True, ax=None):
+    draw_plot(full_df, ['ncumul_deceased'], timeline=timeline,
+              title='Switzerland Covid-19 deaths', ax=ax)
+
+
+def draw_confirmed(full_df, timeline=True, ax=None):
+    draw_plot(full_df, ['ncumul_conf'], timeline=timeline,
+              title='Switzerland Covid-19 new confirmed cases', ax=ax)
+
+def draw_deceased_FR(full_df, timeline=True, ax=None):
+    draw_plot(full_df, ['ncumul_deceased'], timeline=timeline, cantons=['FR'],
+              title='Covid-19 deaths in canton FR', ax=ax)
+
+
+def draw_confirmed_FR(full_df, timeline=True, ax=None):
+    draw_plot(full_df, ['ncumul_conf'], timeline=timeline, cantons=['FR'],
+              title='Covid-19 new confirmed cases in canton FR', ax=ax)
+
+
+if __name__ == '__main__':
+    plt.ion()
+    matplotlib.interactive(True)
+    full_df = preprocess('COVID19_Fallzahlen_CH_total.csv')
+    
+    fig, axes = plt.subplots(2, 1)
+    
+    draw_deceased(full_df, ax=axes[0])
+    draw_confirmed(full_df, ax=axes[1])
+
+    plt.show(block=True)

@@ -5,6 +5,8 @@ This is a set of functions to analyze the data from the csv file from the reposi
 
 It fills missing data, checks for inconsistencies in the cumulative numbers and defines useful functions for analysis.
 
+I have also made some basic visualizations on a map of Switzerland by using Tableau (confirmed cases and deceased). These graphs will not be kept up to date since the pull from github and the publication on Tableau aren't automatic, but they can be found [here](https://public.tableau.com/profile/millerp#!/vizhome/SwissCovid/MapofNewDailyConfirmedCases).
+
 ## Setup
 ### Windows
 Run the actualize command to get the new version of the csv file

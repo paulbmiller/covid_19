@@ -357,10 +357,37 @@ def draw_confirmed_FR(full_df, timeline=True, ax=None):
               title='Covid-19 new confirmed cases in canton FR', ax=ax)
 
 
+def remove_cumul(full_df, cumul_columns):
+    df = full_df.copy()
+    
+    grpby = df.groupby(by='canton')
+    for col in cumul_columns:
+        df[col] = grpby[col].diff().fillna(0).clip(lower=0)
+    
+    return df
+
+
+
 if __name__ == '__main__':
     plt.ion()
     matplotlib.interactive(True)
     full_df = preprocess('COVID19_Fallzahlen_CH_total.csv')
+    
+    cumul_columns = [col_name for col_name in full_df.columns \
+                     if col_name[:6] == 'ncumul']
+    
+    new_names = [name.replace('ncumul', 'new') for name in cumul_columns]
+    
+    rename_cols = \
+        {cumul_columns[i] : new_names[i] for i in range(len(new_names))}
+    
+    df_for_tableau = remove_cumul(full_df,
+                                  ['ncumul_tested', 'ncumul_conf',
+                                   'ncumul_released', 'ncumul_deceased'])
+    
+    df_for_tableau.rename(columns=rename_cols, inplace=True)
+    
+    df_for_tableau.to_csv('New_COVID19.csv')
     
     fig, axes = plt.subplots(2, 1)
     
